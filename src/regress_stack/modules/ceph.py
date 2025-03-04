@@ -6,11 +6,13 @@ import typing
 import uuid
 from pathlib import Path
 
+from regress_stack.core import apt as core_apt
 from regress_stack.core import utils as core_utils
 from regress_stack.modules import utils as module_utils
 
 LOG = logging.getLogger(__name__)
 
+IS_OPTIONAL = True
 PACKAGES = ["ceph-mgr", "ceph-mon", "ceph-osd", "ceph-volume"]
 LOGS = ["/var/log/ceph/"]
 
@@ -75,7 +77,13 @@ TasksMax=infinity
 WantedBy=ceph-osd.target
 """
 
+def installed() -> bool:
+    return core_apt.pkgs_installed(PACKAGES)
+
 def setup():
+    if not installed():
+        return
+
     module_utils.cfg_set(
         CONF,
         *module_utils.dict_to_cfg_set_args(
