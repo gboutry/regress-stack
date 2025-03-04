@@ -83,7 +83,8 @@ def build_dependency_graph(modules_mod: types.ModuleType) -> nx.DiGraph:
             canonical_name,
             module_loaded,
         )
-        if hasattr(module_loaded, "PACKAGES"):
+        if hasattr(module_loaded, "PACKAGES") and not getattr(
+                module_loaded, "IS_OPTIONAL", False):
             for pkg_name in module_loaded.PACKAGES:
                 if not apt.pkgs_installed([pkg_name]):
                     missing_deps.add(pkg_name)
