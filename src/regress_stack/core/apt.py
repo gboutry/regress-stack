@@ -1,6 +1,6 @@
-import apt
 import typing
 
+import apt
 
 APT_CACHE: type(apt.cache.Cache) = None
 

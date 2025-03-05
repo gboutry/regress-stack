@@ -4,7 +4,6 @@ from regress_stack.modules import ceph, keystone, mysql, rabbitmq
 from regress_stack.modules import utils as module_utils
 
 DEPENDENCIES = {ceph, keystone, mysql, rabbitmq}
-IS_OPTIONAL = True
 PACKAGES = ["cinder-api", "cinder-scheduler", "cinder-volume"]
 LOGS = ["/var/log/cinder/"]
 
@@ -15,13 +14,12 @@ SERVICE_TYPE = "volumev3"
 VOLUME_POOL = "volumes"
 VOLUME_USER = VOLUME_POOL
 
+
 def installed() -> bool:
     return core_apt.pkgs_installed(PACKAGES)
 
-def setup():
-    if not installed():
-        return
 
+def setup():
     db_user, db_pass = mysql.ensure_service(SERVICE)
     rabbit_user, rabbit_pass = rabbitmq.ensure_service(SERVICE)
     username, password = keystone.ensure_service_account(SERVICE, SERVICE_TYPE, URL)
