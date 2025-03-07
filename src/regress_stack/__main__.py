@@ -66,7 +66,7 @@ def collect_logs():
 
 
 @utils.measure_time
-def test():
+def test(concurrency: int):
     env = keystone.auth_env()
     dir_name = "mycloud01"
     release = utils.release()
@@ -128,7 +128,13 @@ def test():
     try:
         utils.run(
             "tempest",
-            ["run", "--load-list", str(regress_list.relative_to(dir_name)), "--serial"],
+            [
+                "run",
+                "--load-list",
+                str(regress_list.relative_to(dir_name)),
+                "--concurrency",
+                concurrency,
+            ],
             env=env,
             cwd=dir_name,
         )
@@ -165,7 +171,15 @@ def main():
     parser_setup = subparsers.add_parser("setup", help="Execute the tests.")
     add_common_arguments(parser_setup)
 
-    subparsers.add_parser("test", help="Run the tests.")
+    parser_test = subparsers.add_parser("test", help="Run the tests.")
+    parser_test.add_argument(
+        "--concurrency",
+        nargs="?",
+        type=utils.concurrency_cb,
+        help=(
+            "The number of workers to use, defaults to 1.  The value auto sets concurrency to number of cpus / 3."
+        ),
+    )
 
     subparsers.add_parser("list-modules", help="List available modules.")
 
@@ -178,7 +192,7 @@ def main():
     elif args.command == "setup":
         setup(args.target)
     elif args.command == "test":
-        test()
+        test(concurrency=args.concurrency or 1)
     elif args.command == "list-modules":
         list_modules()
 

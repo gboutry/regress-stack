@@ -5,6 +5,8 @@ import contextlib
 import functools
 import ipaddress
 import logging
+import math
+import multiprocessing
 import pathlib
 import platform
 import socket
@@ -185,3 +187,13 @@ def is_setup_done(name: str) -> bool:
     """Check if task is done."""
     done_file = REGRESS_STACK_DIR / (name + ".setup")
     return done_file.exists()
+
+
+def concurrency_cb(arg: str) -> int:
+    """Handle concurrency argument, for use with ArgumentParser.
+
+    :raises: ValueError.
+    """
+    if arg == "auto":
+        return math.ceil(multiprocessing.cpu_count() / 3)
+    return int(arg)
