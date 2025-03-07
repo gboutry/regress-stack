@@ -5,6 +5,9 @@ import contextlib
 import functools
 import ipaddress
 import logging
+import math
+import multiprocessing
+import os
 import pathlib
 import platform
 import socket
@@ -83,6 +86,35 @@ def run(
         result.stderr,
     )
     return result.stdout
+
+
+def system(
+    cmd: str,
+    env: typing.Optional[typing.Dict[str, str]] = None,
+    cwd: typing.Optional[str] = None,
+) -> int:
+    exit_code = -1
+    saved_env = os.environ
+    saved_cwd = os.getcwd()
+
+    # NOTE: os.system does not check nor raise on non-zero return code from
+    # command.
+    #
+    # We do try/finally for consistency and in the event we add handling of
+    # OSError level exceptions at some point in the future.
+    try:
+        if env:
+            os.environ.update(env)
+        if cwd:
+            os.chdir(cwd)
+        exit_code = os.waitstatus_to_exitcode(os.system(cmd))
+    finally:
+        if env:
+            os.environ = saved_env
+        if cwd:
+            os.chdir(saved_cwd)
+
+    return exit_code
 
 
 def sudo(
@@ -185,3 +217,13 @@ def is_setup_done(name: str) -> bool:
     """Check if task is done."""
     done_file = REGRESS_STACK_DIR / (name + ".setup")
     return done_file.exists()
+
+
+def concurrency_cb(arg: str) -> int:
+    """Handle concurrency argument, for use with ArgumentParser.
+
+    :raises: ValueError.
+    """
+    if arg == "auto":
+        return math.ceil(multiprocessing.cpu_count() / 3)
+    return int(arg)
