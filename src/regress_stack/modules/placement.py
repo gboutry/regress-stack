@@ -14,7 +14,7 @@ PACKAGES = ["placement-api"]
 LOGS = ["/var/log/placement/"]  # empty?
 
 CONF = "/etc/placement/placement.conf"
-URL = f"http://{core_utils.fqdn()}:8778/"
+URL = f"http://{core_utils.my_ip()}:8778/"
 
 
 def setup():

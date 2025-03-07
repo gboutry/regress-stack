@@ -21,7 +21,7 @@ LOGS = ["/var/log/keystone/"]
 
 CONF = "/etc/keystone/keystone.conf"
 ADMIN_PASSWORD = "changeme"
-OS_AUTH_URL = f"http://{core_utils.fqdn()}:5000/v3/"
+OS_AUTH_URL = f"http://{core_utils.my_ip()}:5000/v3/"
 SERVICE_DOMAIN = "service"
 SERVICE_PROJECT = "service"
 
@@ -271,10 +271,24 @@ def ensure_endpoint(service, url: str):
 def grant_domain_role(user, role, domain):
     conn = o7k()
     LOG.debug("Granting role %r to user %r...", role, user)
-    domain.assign_role_to_user(conn.identity, user, role)
+    try:
+        domain.assign_role_to_user(conn.identity, user, role, False)
+    except TypeError as e:
+        # Fallback for caracal and under
+        if "were given" in str(e):
+            domain.assign_role_to_user(conn.identity, user, role)
+        else:
+            raise e
 
 
 def grant_project_role(user, role, project):
     conn = o7k()
     LOG.debug("Granting role %r to user %r...", role, user)
-    project.assign_role_to_user(conn.identity, user, role)
+    try:
+        project.assign_role_to_user(conn.identity, user, role, False)
+    except TypeError as e:
+        # Fallback for caracal and under
+        if "were given" in str(e):
+            project.assign_role_to_user(conn.identity, user, role)
+        else:
+            raise e
