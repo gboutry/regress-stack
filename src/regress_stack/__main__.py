@@ -125,22 +125,18 @@ def test(concurrency: int):
     regress_list = pathlib.Path(dir_name) / "regress_tests.txt"
     regress_list.write_text(regress_tests)
 
-    try:
-        utils.run(
-            "tempest",
-            [
-                "run",
-                "--load-list",
-                str(regress_list.relative_to(dir_name)),
-                "--concurrency",
-                concurrency,
-            ],
-            env=env,
-            cwd=dir_name,
-        )
-    except subprocess.CalledProcessError:
-        # silence to fail on the next command
-        pass
+    # The tempest run is a long-running process and to improve UX we want
+    # direct output of both STDOUT and STDERR.
+    #
+    # Implementing that with subprocess is complicated, and as we do not need
+    # to process the output we can use system().
+    load_list = str(regress_list.relative_to(dir_name))
+    utils.system(
+        f"tempest run --load-list {load_list} --concurrency {concurrency}",
+        env,
+        dir_name,
+    )
+
     try:
         with utils.banner("Fetching failing tests"):
             utils.run("stestr", ["failing", "--list"], cwd=dir_name)
