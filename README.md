@@ -9,7 +9,7 @@ To get started with Regress Stack, follow these simple steps:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/gboutry/regress-stack.git
+   git clone https://github.com/canonical/regress-stack.git
    cd regress-stack
    ```
 
