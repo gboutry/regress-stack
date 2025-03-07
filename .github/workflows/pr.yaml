@@ -30,3 +30,6 @@ jobs:
 
     - name: Run unit-tests
       run: uv run py.test
+
+  functional-tests:
+    uses: ./.github/workflows/functional-tests.yaml
