@@ -19,7 +19,7 @@ LOGS = ["/var/log/neutron/"]
 CONF = "/etc/neutron/neutron.conf"
 METADATA_AGENT_CONF = "/etc/neutron/neutron_ovn_metadata_agent.ini"
 ML2_CONF = "/etc/neutron/plugins/ml2/ml2_conf.ini"
-URL = f"http://{core_utils.fqdn()}:9696/"
+URL = f"http://{core_utils.my_ip()}:9696/"
 
 METADATA_SECRET = "bonjour"
 
@@ -122,7 +122,7 @@ def setup():
         except Exception as e:
             if "Connection refused" in str(e):
                 LOG.debug("Waiting for neutron-server to start...")
-                time.sleep(1)
+                time.sleep(5)
                 continue
             raise e
 

@@ -45,7 +45,7 @@ PACKAGES = [
 LOG = logging.getLogger(__name__)
 
 CONF = "/etc/nova/nova.conf"
-URL = f"http://{core_utils.fqdn()}:8774/v2.1"
+URL = f"http://{core_utils.my_ip()}:8774/v2.1"
 NOVA_CEPH_UUID = pathlib.Path("/etc/nova/ceph_uuid")
 SERVICE = "nova"
 SERVICE_TYPE = "compute"
@@ -171,10 +171,13 @@ def setup():
     core_utils.restart_service("nova-conductor")
     core_utils.restart_service("nova-compute")
     # Give some time for nova-compute to be up before discovering hosts
-    time.sleep(15)
-    core_utils.sudo(
-        "nova-manage", ["cell_v2", "discover_hosts", "--verbose"], user="nova"
-    )
+    for _ in range(25):
+        output = core_utils.sudo(
+            "nova-manage", ["cell_v2", "discover_hosts", "--verbose"], user="nova"
+        )
+        if core_utils.fqdn() in output:
+            break
+        time.sleep(5)
 
 
 def virt_type() -> str:

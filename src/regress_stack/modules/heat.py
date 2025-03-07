@@ -15,7 +15,7 @@ PACKAGES = ["heat-api", "heat-api-cfn", "heat-engine"]
 LOGS = ["/var/log/heat/"]
 
 CONF = "/etc/heat/heat.conf"
-URL = f"http://{core_utils.fqdn()}:8004"
+URL = f"http://{core_utils.my_ip()}:8004"
 URL_CFN = URL + "/v1"
 URL_ORCHESTRATION = URL_CFN + "/%(tenant_id)s"
 SERVICE = "heat"
@@ -28,7 +28,7 @@ HEAT_STACK_ADMIN_PASSWORD = "changeme"
 HEAT_STACK_OWNER = "heat_stack_owner"
 HEAT_STACK_USER = "heat_stack_user"
 
-URL_HEAT_METADATA = f"http://{core_utils.fqdn()}:8000"
+URL_HEAT_METADATA = f"http://{core_utils.my_ip()}:8000"
 URL_HEAT_METADATA_WAIT = URL_HEAT_METADATA + "/v1/waitcondition"
 
 

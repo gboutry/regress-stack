@@ -11,7 +11,7 @@ PACKAGES = ["cinder-api", "cinder-scheduler", "cinder-volume"]
 LOGS = ["/var/log/cinder/"]
 
 CONF = "/etc/cinder/cinder.conf"
-URL = f"http://{core_utils.fqdn()}:8776/v3/%(project_id)s"
+URL = f"http://{core_utils.my_ip()}:8776/v3/%(project_id)s"
 SERVICE = "cinder"
 SERVICE_TYPE = "volumev3"
 VOLUME_POOL = "volumes"

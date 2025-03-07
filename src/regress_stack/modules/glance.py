@@ -10,7 +10,7 @@ PACKAGES = ["glance-api"]
 LOGS = ["/var/log/glance/"]
 
 CONF = "/etc/glance/glance-api.conf"
-URL = f"http://{core_utils.fqdn()}:9292/"
+URL = f"http://{core_utils.my_ip()}:9292/"
 SERVICE = "glance"
 SERVICE_TYPE = "image"
 
