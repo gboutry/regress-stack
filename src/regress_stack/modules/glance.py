@@ -1,6 +1,8 @@
 # Copyright 2025 - Canonical Ltd
 # SPDX-License-Identifier: Apache-2.0
 
+import pathlib
+
 from regress_stack.core import utils as core_utils
 from regress_stack.modules import keystone, mysql
 from regress_stack.modules import utils as module_utils
@@ -37,3 +39,14 @@ def setup():
     )
     core_utils.sudo("glance-manage", ["db_sync"], user=SERVICE)
     core_utils.restart_service("glance-api")
+
+
+def ensure_image(name: str, filepath: pathlib.Path, **kwargs):
+    conn = keystone.o7k()
+
+    image = conn.image.find_image(name, ignore_missing=True)
+    if image:
+        return image
+    return conn.image.create_image(
+        name=name, filename=str(filepath), wait=True, **kwargs
+    )

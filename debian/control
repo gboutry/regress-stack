@@ -23,6 +23,8 @@ Depends:
  crudini,
  python3-tempestconf,
  tempest,
+ wget,
+ xz-utils,
  ${misc:Depends},
  ${python3:Depends},
 Description: Regression testing tools for Ubuntu OpenStack

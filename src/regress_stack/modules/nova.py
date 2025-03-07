@@ -292,3 +292,12 @@ def ensure_libvirt_ceph_secret() -> str:
         ],
     )
     return secret_uuid
+
+
+def ensure_flavor(name: str, ram: int, vcpus: int, disk: int):
+    """Ensure a flavor exists."""
+    conn = keystone.o7k()
+    flavor = conn.compute.find_flavor(name, ignore_missing=True)
+    if flavor:
+        return flavor
+    return conn.compute.create_flavor(name=name, vcpus=vcpus, ram=ram, disk=disk)
