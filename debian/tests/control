@@ -54,9 +54,9 @@ Depends:
  nova-conductor,
  nova-scheduler,
  nova-spiceproxy,
+ openvswitch-switch,
  ovn-central,
  ovn-host,
- openvswitch-switch,
  placement-api,
  rabbitmq-server,
 Restrictions:

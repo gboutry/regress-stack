@@ -113,13 +113,18 @@ def test(concurrency: int):
     )
 
     for include_regexes, exclude_regexes in test_regexes:
-        args = []
-        for regex in include_regexes:
-            args.extend(("--regex", regex))
-        for regex in exclude_regexes:
-            args.extend(("--exclude-regex", regex))
         regress_tests += utils.run(
-            "tempest", ["run", "--list", *args], env=env, cwd=dir_name
+            "tempest",
+            [
+                "run",
+                "--list",
+                "--regex",
+                "|".join(include_regexes),
+                "--exclude-regex",
+                "|".join(exclude_regexes),
+            ],
+            env=env,
+            cwd=dir_name,
         )
 
     regress_list = pathlib.Path(dir_name) / "regress_tests.txt"

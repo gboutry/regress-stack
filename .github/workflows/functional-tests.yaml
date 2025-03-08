@@ -35,4 +35,4 @@ jobs:
 
     - name: Test
       run: |
-        sudo uv run regress-stack test
+        sudo uv run regress-stack test --concurrency 4
