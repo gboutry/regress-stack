@@ -177,6 +177,9 @@ def setup():
         )
         if core_utils.fqdn() in output:
             break
+        output = core_utils.sudo("nova-manage", ["cell_v2", "list_hosts"], user="nova")
+        if core_utils.fqdn() in output:
+            break
         time.sleep(5)
 
 
