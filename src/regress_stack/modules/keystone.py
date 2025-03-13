@@ -7,6 +7,8 @@ import os
 import pathlib
 import typing
 
+import openstack
+
 from regress_stack.core import utils as core_utils
 from regress_stack.modules import mysql, utils
 from regress_stack.modules import utils as module_utils
@@ -123,9 +125,6 @@ def auth_rc():
 @functools.lru_cache()
 def o7k():
     os.environ.update(auth_env())
-    import openstack
-
-    openstack.enable_logging(debug=True)
     conn = openstack.connect(load_envvars=True)
     return conn
 
