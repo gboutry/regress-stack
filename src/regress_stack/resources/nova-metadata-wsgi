@@ -1,0 +1,4 @@
+# Shim for nova-metadata WSGI application.
+# The nova.wsgi.metadata module creates the application object
+# directly at import time (no init_application callable).
+from nova.wsgi.metadata import application  # noqa: F401

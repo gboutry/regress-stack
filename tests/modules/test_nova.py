@@ -45,6 +45,50 @@ def test_ensure_sudo_rs_rootwrap(tmp_path, monkeypatch):
     assert warnings
 
 
+def test_ensure_nova_wsgi_scripts(tmp_path, monkeypatch):
+    api_wsgi = tmp_path / "nova-api-wsgi"
+    metadata_wsgi = tmp_path / "nova-metadata-wsgi"
+    warnings = []
+
+    monkeypatch.setattr(nova, "NOVA_API_WSGI", api_wsgi)
+    monkeypatch.setattr(nova, "NOVA_METADATA_WSGI", metadata_wsgi)
+    monkeypatch.setattr(
+        nova.core_utils,
+        "warn_workaround",
+        lambda subject, detail: warnings.append((subject, detail)),
+    )
+
+    nova._ensure_nova_wsgi_scripts()
+
+    assert api_wsgi.exists()
+    assert metadata_wsgi.exists()
+    assert api_wsgi.stat().st_mode & 0o777 == 0o755
+    assert metadata_wsgi.stat().st_mode & 0o777 == 0o755
+    assert len(warnings) == 2
+
+
+def test_ensure_nova_wsgi_scripts_is_noop_when_present(tmp_path, monkeypatch):
+    api_wsgi = tmp_path / "nova-api-wsgi"
+    metadata_wsgi = tmp_path / "nova-metadata-wsgi"
+    api_wsgi.write_text("existing")
+    metadata_wsgi.write_text("existing")
+    warnings = []
+
+    monkeypatch.setattr(nova, "NOVA_API_WSGI", api_wsgi)
+    monkeypatch.setattr(nova, "NOVA_METADATA_WSGI", metadata_wsgi)
+    monkeypatch.setattr(
+        nova.core_utils,
+        "warn_workaround",
+        lambda subject, detail: warnings.append((subject, detail)),
+    )
+
+    nova._ensure_nova_wsgi_scripts()
+
+    assert api_wsgi.read_text() == "existing"
+    assert metadata_wsgi.read_text() == "existing"
+    assert len(warnings) == 0
+
+
 def test_ensure_metadata_site_when_missing(tmp_path, monkeypatch):
     sites_enabled = tmp_path / "sites-enabled"
     sites_available = tmp_path / "sites-available"

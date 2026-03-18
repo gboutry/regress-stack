@@ -1,0 +1,4 @@
+# Shim for nova-api WSGI application.
+# The nova.wsgi.osapi_compute module creates the application object
+# directly at import time (no init_application callable).
+from nova.wsgi.osapi_compute import application  # noqa: F401

@@ -29,6 +29,47 @@ METADATA_SECRET = "bonjour"
 EXTERNAL_NETWORK = "external-network"
 
 NEUTRON_SPLIT_SERVICES_VERSION = "26.0.0"
+EXTERNAL_NET_DB = "/usr/lib/python3/dist-packages/neutron/db/external_net_db.py"
+
+
+def _fix_neutron_lib_compat() -> None:
+    """Work around neutron_lib.constants.ACCESS_READONLY removal.
+
+    neutron-lib 3.23.0 (Resolute) removed the ACCESS_READONLY constant
+    but neutron 27.0.0 still references it in external_net_db.py.
+    Remove the stale reference so neutron can start.
+    """
+    try:
+        import neutron_lib.constants as constants
+
+        if hasattr(constants, "ACCESS_READONLY"):
+            return
+    except ImportError:
+        return
+
+    import pathlib
+
+    db_file = pathlib.Path(EXTERNAL_NET_DB)
+    if not db_file.exists():
+        return
+    content = db_file.read_text()
+    old = (
+        "EXTERNAL_NETWORK_RBAC_ACTIONS = {constants.ACCESS_SHARED,\n"
+        "                                 constants.ACCESS_READONLY,\n"
+        "                                 constants.ACCESS_EXTERNAL}"
+    )
+    new = (
+        "EXTERNAL_NETWORK_RBAC_ACTIONS = {constants.ACCESS_SHARED,\n"
+        "                                 constants.ACCESS_EXTERNAL}"
+    )
+    if old not in content:
+        return
+    core_utils.warn_workaround(
+        "neutron + neutron-lib version mismatch",
+        "removing reference to ACCESS_READONLY constant that was dropped "
+        "from neutron-lib 3.23.0 but still used by neutron 27.0.0",
+    )
+    db_file.write_text(content.replace(old, new))
 
 
 def determine_packages(no_tempest: bool = False) -> list[str]:
@@ -47,6 +88,8 @@ def determine_packages(no_tempest: bool = False) -> list[str]:
 
 
 def setup():
+    _fix_neutron_lib_compat()
+
     # mask neutron-server if running flamingo.
     if (
         core_apt.PkgVersionCompare("python3-neutron", upstream=True)

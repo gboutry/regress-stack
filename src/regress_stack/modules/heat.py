@@ -24,6 +24,8 @@ SERVICE_CFN = "heat-cfn"
 SERVICE_TYPE = "orchestration"
 SERVICE_TYPE_CFN = "cloudformation"
 HEAT_APACHE_API_VERSION = "25.0.0"
+HEAT_API_WSGI = pathlib.Path("/usr/bin/heat-wsgi-api")
+HEAT_API_BINARY = pathlib.Path("/usr/bin/heat-api")
 HEAT_STACK_ADMIN = "heat_admin"
 HEAT_STACK_ADMIN_PASSWORD = "changeme"
 
@@ -105,6 +107,7 @@ def setup():
         core_apt.PkgVersionCompare("python3-heat", upstream=True)
         >= HEAT_APACHE_API_VERSION
     ):
+        _ensure_heat_api_wsgi()
         heat_daemons.remove("heat-api")
         heat_daemons.remove("heat-api-cfn")
         # heat-api and heat-api-cfn run as WSGI apps under apache2.
@@ -112,6 +115,25 @@ def setup():
 
     for _daemon in heat_daemons:
         core_utils.restart_service(_daemon)
+
+
+def _ensure_heat_api_wsgi() -> None:
+    """Ensure /usr/bin/heat-api exists for the Apache WSGI config.
+
+    On Resolute (26.04) the heat-api package ships an Apache site referencing
+    /usr/bin/heat-api, but the binary was renamed to /usr/bin/heat-wsgi-api.
+    Create a symlink when the old name is absent.
+    """
+    if HEAT_API_BINARY.exists():
+        return
+    if not HEAT_API_WSGI.exists():
+        return
+    core_utils.warn_workaround(
+        "heat packaging",
+        f"{HEAT_API_BINARY.name} is missing; symlinking to {HEAT_API_WSGI.name} "
+        "until the Ubuntu package is fixed",
+    )
+    HEAT_API_BINARY.symlink_to(HEAT_API_WSGI)
 
 
 def configure_tempest(tempest_conf: pathlib.Path):

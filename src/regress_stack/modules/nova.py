@@ -63,6 +63,9 @@ NOVA_METADATA_PROCESS_GROUP = "nova-metadata"
 NOVA_PRIVSEP_HELPER = (
     "sudo /usr/bin/nova-rootwrap /etc/nova/rootwrap.conf privsep-helper"
 )
+RESOURCE_PKG = "regress_stack.resources"
+NOVA_API_WSGI = pathlib.Path("/usr/bin/nova-api-wsgi")
+NOVA_METADATA_WSGI = pathlib.Path("/usr/bin/nova-metadata-wsgi")
 
 
 def determine_packages(no_tempest: bool = False) -> list[str]:
@@ -225,7 +228,27 @@ def _ensure_questing_compat() -> None:
             ("vif_plug_ovs_privileged", "helper_command", NOVA_PRIVSEP_HELPER),
         )
     if _api_runs_under_apache():
+        _ensure_nova_wsgi_scripts()
         _ensure_metadata_site()
+
+
+def _ensure_nova_wsgi_scripts() -> None:
+    for resource, destination in (
+        ("nova-api-wsgi", NOVA_API_WSGI),
+        ("nova-metadata-wsgi", NOVA_METADATA_WSGI),
+    ):
+        if destination.exists():
+            continue
+        core_utils.warn_workaround(
+            "nova packaging",
+            f"{destination.name} is missing; installing a local shim until the Ubuntu package is fixed",
+        )
+        core_utils.write_resource(
+            RESOURCE_PKG,
+            resource,
+            destination,
+            mode=0o755,
+        )
 
 
 def _using_sudo_rs() -> bool:
