@@ -18,6 +18,32 @@ from regress_stack.cli.utils import collect_logs
 
 LOG = logging.getLogger(__name__)
 
+TEMPESTCONF_MAIN = pathlib.Path("/usr/lib/python3/dist-packages/config_tempest/main.py")
+
+
+def _fix_tempestconf_sdk_compat() -> None:
+    """Work around tempestconf / openstacksdk API mismatch.
+
+    python-tempestconf 3.5.1 calls ``openstack.connect(argparse=...)`` but
+    openstacksdk >= 4.x removed that keyword, causing a TypeError.
+    Patch the call to use ``load_envvars=True`` instead, which works because
+    regress-stack already injects OS_* env vars.
+    """
+    if not TEMPESTCONF_MAIN.exists():
+        return
+    content = TEMPESTCONF_MAIN.read_text()
+    old = "cloud = openstack.connect(argparse=args_namespace)"
+    new = "cloud = openstack.connect(load_envvars=True)"
+    if old not in content:
+        return
+    utils.warn_workaround(
+        "tempestconf + openstacksdk version mismatch",
+        "replacing argparse= kwarg with load_envvars=True in "
+        "config_tempest/main.py until the package is fixed",
+    )
+    content = content.replace(old, new)
+    TEMPESTCONF_MAIN.write_text(content)
+
 
 @click.command()
 @click.option(
@@ -43,6 +69,7 @@ def test(concurrency, retry_failed):
     if core_apt.PkgVersionCompare("python3-tempestconf") < "3.5.1-1ubuntu1~cloud0":
         core_apt.add_ppa("ppa:freyes/lp2141604")
         utils.run("apt", ["install", "-yq", "--only-upgrade", "python3-tempestconf"])
+    _fix_tempestconf_sdk_compat()
     env = os.environ.copy()
     env.update(keystone.auth_env())
     dir_name = "mycloud01"
