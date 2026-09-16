@@ -91,10 +91,16 @@ class Deployment:
     management_cidr: str
     provider: ProviderNetwork
     schema: int = 1
+    disabled_modules: tuple[str, ...] = ()
 
     def __post_init__(self):
         if type(self.schema) is not int or self.schema != 1:
             raise ValueError("Unsupported inventory schema")
+        allowed_disabled = {"heat", "magnum", "watcher"}
+        if not set(self.disabled_modules) <= allowed_disabled:
+            raise ValueError("Unsupported disabled module")
+        if "heat" in self.disabled_modules and "magnum" not in self.disabled_modules:
+            raise ValueError("Disabling heat also requires disabling magnum")
         expected = {"single": 1, "hyperconverged": 3}.get(self.profile)
         if expected is None or len(self.controllers) != expected:
             raise ValueError("Profiles require exactly one or three controllers")
@@ -150,6 +156,7 @@ class Deployment:
                     "controllers": tuple(Node(**node) for node in data["controllers"]),
                     "computes": tuple(Node(**node) for node in data["computes"]),
                     "provider": ProviderNetwork(**data["provider"]),
+                    "disabled_modules": tuple(data.get("disabled_modules", ())),
                 }
             )
         except (TypeError, KeyError, AttributeError) as exc:

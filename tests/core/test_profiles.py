@@ -79,3 +79,25 @@ def test_controllers_have_identical_package_requirements(deployment):
         "valkey-server",
         "valkey-sentinel",
     } <= set(required[0])
+
+
+def test_optional_services_can_be_excluded_from_hyperconverged_profile(deployment):
+    data = {
+        **deployment.__dict__,
+        "disabled_modules": ("heat", "magnum", "watcher"),
+    }
+    scoped = Deployment(**data)
+    for node in scoped.controllers:
+        context = Context(scoped, node.name, str(uuid.uuid4()))
+        names = {module.name for module in profiles.execution_order(context, False)}
+        assert {"nova", "neutron", "ovn"} <= names
+        assert not names & {"heat", "magnum", "watcher"}
+        packages = profiles.packages(context)
+        assert not any(
+            package.startswith(("heat-", "magnum-", "watcher-")) for package in packages
+        )
+
+
+def test_heat_cannot_be_excluded_while_magnum_is_enabled(deployment):
+    with pytest.raises(ValueError, match="requires disabling magnum"):
+        Deployment(**{**deployment.__dict__, "disabled_modules": ("heat",)})

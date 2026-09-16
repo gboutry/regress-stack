@@ -69,6 +69,11 @@ COMPUTE_MODULES = (
 
 def execution_order(context: Context, check_packages: bool = True) -> list[LocalModule]:
     modules = CONTROLLER_MODULES if context.controller else COMPUTE_MODULES
+    modules = tuple(
+        module
+        for module in modules
+        if module.name not in context.deployment.disabled_modules
+    )
     by_name = {module.name: module for module in modules}
     graph = nx.DiGraph()
     for module in modules:

@@ -12,6 +12,11 @@ Nova compute, OVN host, and the metadata agent with Ceph client access. The
 `single` profile has one controller and may also have compute-only nodes; its
 API address is the controller address. It does not provide controller HA.
 
+An inventory may set `"disabled_modules": ["heat", "magnum", "watcher"]` to
+omit those services and their packages from an explicit profile. Magnum must
+also be disabled when Heat is disabled because it depends on Heat. Other
+modules cannot be disabled through this field.
+
 VM provisioning, package installation, file transfer, command execution on each
 VM, and failure injection belong to the operator or CI harness. Regress-stack
 runs local commands and uses service protocols to join shared state. It does
