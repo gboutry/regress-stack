@@ -187,15 +187,16 @@ def check(context: Context, unavailable: str | None = None) -> list[str]:
         return queue_replicas_ready(rows, len(context.deployment.controllers))
 
     verify("RabbitMQ queue replicas", queues)
-    verify(
-        "Ceph monitor quorum",
-        lambda: set(
-            json.loads(common.run("ceph", ["quorum_status", "--format", "json"]))[
-                "quorum_names"
-            ]
+    if "ceph" not in context.deployment.disabled_modules:
+        verify(
+            "Ceph monitor quorum",
+            lambda: set(
+                json.loads(common.run("ceph", ["quorum_status", "--format", "json"]))[
+                    "quorum_names"
+                ]
+            )
+            == expected_controllers,
         )
-        == expected_controllers,
-    )
 
     def placement_groups() -> bool:
         status: _CephStatus = json.loads(
@@ -223,7 +224,8 @@ def check(context: Context, unavailable: str | None = None) -> list[str]:
             for pg in pgs
         )
 
-    verify("Ceph usable placement groups", placement_groups)
+    if "ceph" not in context.deployment.disabled_modules:
+        verify("Ceph usable placement groups", placement_groups)
     for node in context.deployment.controllers:
         if node.name == unavailable:
             continue
@@ -328,16 +330,18 @@ def check(context: Context, unavailable: str | None = None) -> list[str]:
 
     verify("Nova compute registration", computes)
 
-    verify(
-        "Cinder volume registration",
-        lambda: volume_hosts(connection.block_storage) == expected_controllers,
-    )
+    if "cinder" not in context.deployment.disabled_modules:
+        verify(
+            "Cinder volume registration",
+            lambda: volume_hosts(connection.block_storage) == expected_controllers,
+        )
     api_queries: tuple[tuple[str, Callable[[], Iterable[object]]], ...] = (
         ("compute API", lambda: connection.compute.flavors()),
         ("image API", lambda: connection.image.images()),
         ("network API", lambda: connection.network.networks()),
-        ("volume API", lambda: connection.block_storage.volumes()),
     )
+    if "cinder" not in context.deployment.disabled_modules:
+        api_queries += (("volume API", lambda: connection.block_storage.volumes()),)
     for name, query in api_queries:
 
         def responds(query: Callable[[], Iterable[object]] = query) -> bool:

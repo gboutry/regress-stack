@@ -47,6 +47,9 @@ def determine_packages(no_tempest: bool = False) -> list[str]:
 
 
 def setup():
+    from regress_stack.core.deployment import current
+
+    context = current()
     # mask neutron-server if running flamingo.
     if (
         core_apt.PkgVersionCompare("python3-neutron", upstream=True)
@@ -123,7 +126,11 @@ def setup():
                 "ovn_sb_connection": ovn.sb_connection(),
                 "ovn_l3_scheduler": "leastloaded",
                 "ovn_metadata_enabled": "true",
-                "enable_distributed_floating_ip": "true",
+                "enable_distributed_floating_ip": (
+                    "false"
+                    if context is not None and context.deployment.profile == "control"
+                    else "true"
+                ),
                 "dhcp_default_lease_time": "600",
             },
         ),

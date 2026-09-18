@@ -79,7 +79,8 @@ def ensure_image(name: str, filepath: pathlib.Path, **kwargs):
 def _store_config():
     from regress_stack.core.deployment import current
 
-    if current():
+    context = current()
+    if context and "ceph" not in context.deployment.disabled_modules:
         return [
             ("DEFAULT", "enabled_backends", "ceph:rbd"),
             ("glance_store", "default_backend", "ceph"),

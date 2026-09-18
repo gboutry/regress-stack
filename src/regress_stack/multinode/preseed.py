@@ -65,18 +65,20 @@ def generate(context: Context) -> None:
             values[f"keystone/{directory}/{number}"] = base64.urlsafe_b64encode(
                 os.urandom(32)
             ).decode()
-    from regress_stack.modules import cinder
+    if "cinder" not in context.deployment.disabled_modules:
+        from regress_stack.modules import cinder
 
-    values["cinder/service-type"] = cinder.get_service_type()
-    values["ceph/fsid"] = str(uuid.uuid4())
-    values["ceph/rbd_uuid"] = str(uuid.uuid4())
-    for name in [
-        *storage.CAPABILITIES,
-        *(f"mgr.{node.name}" for node in context.deployment.controllers),
-    ]:
-        values[f"ceph/{name}"] = common.run(
-            "ceph-authtool", ["--gen-print-key"]
-        ).strip()
+        values["cinder/service-type"] = cinder.get_service_type()
+    if "ceph" not in context.deployment.disabled_modules:
+        values["ceph/fsid"] = str(uuid.uuid4())
+        values["ceph/rbd_uuid"] = str(uuid.uuid4())
+        for name in [
+            *storage.CAPABILITIES,
+            *(f"mgr.{node.name}" for node in context.deployment.controllers),
+        ]:
+            values[f"ceph/{name}"] = common.run(
+                "ceph-authtool", ["--gen-print-key"]
+            ).strip()
     context.values.update(values)
 
 

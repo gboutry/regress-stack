@@ -44,8 +44,9 @@ def get_service_type() -> str:
 def installed() -> bool:
     from regress_stack.core.deployment import current
 
-    if current() is not None:
-        return True
+    context = current()
+    if context is not None:
+        return "cinder" not in context.deployment.disabled_modules
     return core_apt.pkgs_installed(PACKAGES)
 
 

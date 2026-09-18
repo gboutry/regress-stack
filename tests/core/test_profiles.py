@@ -133,3 +133,43 @@ def test_optional_services_can_be_excluded_from_hyperconverged_profile(deploymen
 def test_heat_cannot_be_excluded_while_magnum_is_enabled(deployment):
     with pytest.raises(ValueError, match="requires disabling magnum"):
         Deployment(**{**deployment.__dict__, "disabled_modules": ("heat",)})
+
+
+def test_control_profile_can_omit_storage_and_optional_services(deployment):
+    scoped = Deployment(
+        **{
+            **deployment.__dict__,
+            "profile": "control",
+            "controllers": deployment.controllers[:1],
+            "api_address": deployment.controllers[0].address,
+            "disabled_modules": (
+                "ceph",
+                "cinder",
+                "barbican",
+                "heat",
+                "magnum",
+                "watcher",
+            ),
+        }
+    )
+    for node in scoped.nodes:
+        context = Context(
+            scoped,
+            node.name,
+            str(uuid.uuid4()),
+            {"coordination/implementation": "valkey"},
+        )
+        names = {module.name for module in profiles.execution_order(context, False)}
+        assert not names & set(scoped.disabled_modules)
+        assert {"nova", "neutron", "ovn"} <= names
+        packages = profiles.packages(context)
+        assert not any(
+            package.startswith(("ceph-", "cinder-", "barbican-"))
+            for package in packages
+        )
+        assert "ceph-common" not in packages
+
+
+def test_ceph_cannot_be_excluded_with_cinder_enabled(deployment):
+    with pytest.raises(ValueError, match="requires disabling cinder"):
+        Deployment(**{**deployment.__dict__, "disabled_modules": ("ceph",)})

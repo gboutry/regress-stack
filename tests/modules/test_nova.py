@@ -6,6 +6,10 @@ import subprocess
 from regress_stack.modules import nova
 
 
+def test_nova_packages_include_qemu_spice_support():
+    assert "qemu-system-modules-spice" in nova.determine_packages()
+
+
 def test_using_sudo_rs(monkeypatch):
     monkeypatch.setattr(
         nova.subprocess,

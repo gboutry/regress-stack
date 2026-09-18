@@ -98,6 +98,8 @@ def execution_order(context: Context, check_packages: bool = True) -> list[Local
         graph.add_node(module.name)
         for dependency in module.local_dependencies:
             if dependency not in by_name:
+                if dependency in context.deployment.disabled_modules:
+                    continue
                 raise RuntimeError(
                     f"Missing local dependency {dependency} for {module.name}"
                 )

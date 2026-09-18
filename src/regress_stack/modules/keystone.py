@@ -256,6 +256,9 @@ def ensure_service_account(name: str, type: str, url: str) -> typing.Tuple[str, 
 
     user = ensure_user(name, password, service_domain())
     ensure_admin(user, service_project())
+    o7k().identity.assign_project_role_to_user(
+        service_project(), user, ensure_role("service").id
+    )
     service = ensure_service(name, type)
     ensure_endpoint(service, url)
     return name, password

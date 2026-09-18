@@ -28,7 +28,10 @@ GRANT ALL PRIVILEGES ON {name}.* TO '{database}'@'%';
 def get_host():
     from regress_stack.core.deployment import current
 
-    if current() is not None:
+    context = current()
+    if context is not None and context.deployment.profile == "control":
+        return f"{context.deployment.api_address}:3306"
+    if context is not None:
         return "127.0.0.1:13306"
     return "localhost"
 

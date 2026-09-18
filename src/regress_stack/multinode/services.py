@@ -89,19 +89,28 @@ def prepare(name: str) -> None:
                     context.secret(f"keystone/{folder}/{number}"),
                     user="keystone",
                 )
-    if name == "nova" and context.deployment.profile != "control":
-        # The native module defines a Ceph secret before starting Nova.
-        common.run("systemctl", ["start", "libvirtd"])
+    if name == "nova":
         utils.cfg_set(
-            CONFIGS[name],
-            ("scheduler", "discover_hosts_in_cells_interval", "10"),
-            ("libvirt", "images_type", "rbd"),
-            ("libvirt", "images_rbd_pool", "volumes"),
-            ("libvirt", "images_rbd_ceph_conf", "/etc/ceph/ceph.conf"),
+            CONFIGS[name], ("scheduler", "discover_hosts_in_cells_interval", "10")
+        )
+    if name == "nova" and (
+        not context.controller or context.deployment.profile != "control"
+    ):
+        common.run("systemctl", ["start", "libvirtd"])
+        settings = [
             # Caracal's native os-vif driver opens OVSDB without privsep.
             # Its packaged vsctl driver uses the existing rootwrap helper.
             ("os_vif_ovs", "ovsdb_interface", "vsctl"),
-        )
+        ]
+        if "ceph" not in context.deployment.disabled_modules:
+            settings.extend(
+                (
+                    ("libvirt", "images_type", "rbd"),
+                    ("libvirt", "images_rbd_pool", "volumes"),
+                    ("libvirt", "images_rbd_ceph_conf", "/etc/ceph/ceph.conf"),
+                )
+            )
+        utils.cfg_set(CONFIGS[name], *settings)
     if name == "cinder":
         utils.cfg_set(
             CONFIGS[name],

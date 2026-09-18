@@ -122,6 +122,23 @@ def test_api_and_database_routing(context):
         )
 
 
+def test_control_database_routing_uses_reachable_controller(context):
+    deployment = dataclasses.replace(
+        context.deployment,
+        profile="control",
+        controllers=context.deployment.controllers[:1],
+        api_address=context.deployment.controllers[0].address,
+    )
+    for local_name in ("node1", "compute1"):
+        node = dataclasses.replace(
+            context, deployment=deployment, local_name=local_name
+        )
+        with activate(node):
+            assert mysql.connection_string("nova", "nova", "pw").endswith(
+                "@192.0.2.1:3306/nova"
+            )
+
+
 def test_join_grows_existing_quorum_queues(peer, monkeypatch):
     monkeypatch.setattr(common, "done", lambda _: False)
     for name in ("write", "restart", "mark"):
@@ -163,6 +180,53 @@ def test_export_excludes_server_credentials_from_compute(context, tmp_path):
     peer_values = json.loads((tmp_path / "seeds/node2.json").read_text())["values"]
     assert "ceph/mgr.node2" in peer_values
     assert "ceph/mgr.node3" not in peer_values
+
+
+def test_storage_free_control_preseed_and_nova_config(context, monkeypatch):
+    from regress_stack.modules import ceph, cinder, glance
+    from regress_stack.multinode import services
+
+    control = dataclasses.replace(
+        context,
+        values={},
+        deployment=dataclasses.replace(
+            context.deployment,
+            profile="control",
+            disabled_modules=(
+                "ceph",
+                "cinder",
+                "barbican",
+                "heat",
+                "magnum",
+                "watcher",
+            ),
+        ),
+    )
+    monkeypatch.setattr(coordination, "implementation", lambda: "valkey")
+    monkeypatch.setattr(coordination, "sentinel_auth_supported", lambda: True)
+    forbidden = Mock(side_effect=AssertionError("Ceph must not be used"))
+    monkeypatch.setattr(common, "run", forbidden)
+    preseed.generate(control)
+    assert not any(key.startswith(("ceph/", "cinder/")) for key in control.values)
+    assert not any(
+        key.startswith(("ceph/", "cinder/")) for key in preseed.contributions(control)
+    )
+
+    with activate(control):
+        assert not ceph.installed()
+        assert not cinder.installed()
+        assert ("glance_store", "default_backend", "fs") in glance._store_config()
+
+    compute = dataclasses.replace(control, local_name="compute1")
+    settings = []
+    monkeypatch.setattr(
+        services.utils, "cfg_set", lambda path, *args: settings.extend(args)
+    )
+    monkeypatch.setattr(common, "run", Mock())
+    with activate(compute):
+        services.prepare("nova")
+    assert not any(key.startswith(("images_rbd", "rbd_")) for _, key, _ in settings)
+    assert ("scheduler", "discover_hosts_in_cells_interval", "10") in settings
 
 
 def test_compute_setup_uses_client_credentials_and_only_starts_compute(
@@ -520,7 +584,8 @@ def test_control_nova_starts_api_services_without_compute(context, monkeypatch):
     monkeypatch.setattr(
         keystone, "ensure_service_account", lambda *_: ("nova", "password")
     )
-    monkeypatch.setattr(nova.module_utils, "cfg_set", Mock())
+    cfg_set = Mock()
+    monkeypatch.setattr(nova.module_utils, "cfg_set", cfg_set)
     monkeypatch.setattr(nova.module_utils, "bootstrap", lambda: False)
     monkeypatch.setattr(nova, "_ensure_questing_compat", Mock())
     monkeypatch.setattr(nova, "_api_runs_under_apache", lambda: False)
@@ -533,11 +598,39 @@ def test_control_nova_starts_api_services_without_compute(context, monkeypatch):
     monkeypatch.setattr(nova.core_utils, "restart_service", restarted)
     with activate(control):
         nova.setup()
+    assert ("spice", "enabled", "false") in cfg_set.call_args.args
     assert {call.args[0] for call in restarted.call_args_list} == {
         "nova-api",
         "nova-scheduler",
         "nova-conductor",
     }
+
+
+def test_control_neutron_centralizes_floating_ips(context, monkeypatch):
+    from regress_stack.modules import neutron
+
+    control = dataclasses.replace(
+        context, deployment=dataclasses.replace(context.deployment, profile="control")
+    )
+    monkeypatch.setattr(mysql, "ensure_service", lambda _: ("neutron", "password"))
+    monkeypatch.setattr(rabbitmq, "ensure_service", lambda _: ("neutron", "password"))
+    monkeypatch.setattr(
+        keystone, "ensure_service_account", lambda *_: ("neutron", "password")
+    )
+    cfg_set = Mock()
+    monkeypatch.setattr(neutron.module_utils, "cfg_set", cfg_set)
+    monkeypatch.setattr(neutron.module_utils, "bootstrap_sudo", Mock())
+    monkeypatch.setattr(neutron.module_utils, "bootstrap", lambda: False)
+    monkeypatch.setattr(
+        neutron.core_apt, "PkgVersionCompare", lambda *_args, **_kwargs: "28.0.0"
+    )
+    monkeypatch.setattr(neutron.core_utils, "mask_server", Mock())
+    monkeypatch.setattr(neutron.core_utils, "restart_service", Mock())
+    with activate(control):
+        neutron.setup()
+    assert ("ovn", "enable_distributed_floating_ip", "false") in (
+        cfg_set.call_args_list[1].args
+    )
 
 
 def test_database_capacity_covers_three_controller_clients(context):

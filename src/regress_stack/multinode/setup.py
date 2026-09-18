@@ -169,7 +169,8 @@ def run(
                 access.setup()
                 messaging.setup()
                 coordination.setup()
-            storage.setup()
+            if "ceph" not in context.deployment.disabled_modules:
+                storage.setup()
             networking.setup()
             for module in profiles.execution_order(context, check_packages=False):
                 if module.name in {"utils", "mysql", "rabbitmq", "ceph", "ovn"}:

@@ -97,11 +97,15 @@ class Deployment:
     def __post_init__(self):
         if type(self.schema) is not int or self.schema != 1:
             raise ValueError("Unsupported inventory schema")
-        allowed_disabled = {"heat", "magnum", "watcher"}
+        allowed_disabled = {"ceph", "cinder", "barbican", "heat", "magnum", "watcher"}
         if not set(self.disabled_modules) <= allowed_disabled:
             raise ValueError("Unsupported disabled module")
         if "heat" in self.disabled_modules and "magnum" not in self.disabled_modules:
             raise ValueError("Disabling heat also requires disabling magnum")
+        if "ceph" in self.disabled_modules and "cinder" not in self.disabled_modules:
+            raise ValueError("Disabling ceph requires disabling cinder")
+        if "cinder" in self.disabled_modules and "magnum" not in self.disabled_modules:
+            raise ValueError("Disabling cinder requires disabling magnum")
         allowed_counts = {"single": {1}, "hyperconverged": {3}, "control": {1, 3}}
         if len(self.controllers) not in allowed_counts.get(self.profile, set()):
             raise ValueError("Profiles require exactly one or three controllers")

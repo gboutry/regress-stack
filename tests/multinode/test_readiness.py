@@ -108,3 +108,39 @@ def test_cinder_services_use_version_independent_rest_api():
         "/os-services", params={"binary": "cinder-volume"}
     )
     response.raise_for_status.assert_called_once_with()
+
+
+def test_storage_free_readiness_omits_ceph_and_cinder(context, monkeypatch):
+    import dataclasses
+    from unittest.mock import Mock
+
+    from regress_stack.multinode import readiness
+
+    control = dataclasses.replace(
+        context,
+        deployment=dataclasses.replace(
+            context.deployment,
+            profile="control",
+            disabled_modules=(
+                "ceph",
+                "cinder",
+                "barbican",
+                "heat",
+                "magnum",
+                "watcher",
+            ),
+        ),
+    )
+    client = Mock()
+    client.compute.services.return_value = [
+        Mock(host="compute1", state="up", status="enabled")
+    ]
+    monkeypatch.setattr(
+        readiness.common, "run", Mock(side_effect=RuntimeError("unrelated check"))
+    )
+    monkeypatch.setattr("regress_stack.modules.keystone.o7k", lambda: client)
+    failures = readiness.check(control)
+    assert not any(
+        "Ceph" in name or "Cinder" in name or "volume API" in name for name in failures
+    )
+    client.block_storage.volumes.assert_not_called()

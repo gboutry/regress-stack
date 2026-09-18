@@ -43,6 +43,7 @@ BASE_PACKAGES = [
     "nova-compute",
     "nova-spiceproxy",
     "spice-html5",
+    "qemu-system-modules-spice",
 ]
 LOG = logging.getLogger(__name__)
 
@@ -141,7 +142,11 @@ def setup():
         *module_utils.dict_to_cfg_set_args(
             "spice",
             {
-                "enabled": "true",
+                "enabled": (
+                    "false"
+                    if context is not None and context.deployment.profile == "control"
+                    else "true"
+                ),
                 "agent_enabled": "true",
                 "html5proxy_base_url": f"http://{core_utils.my_ip()}:6082/spice_auto.html",
                 "server_listen": core_utils.my_ip(),
