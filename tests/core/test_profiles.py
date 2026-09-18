@@ -81,6 +81,38 @@ def test_controllers_have_identical_package_requirements(deployment):
     } <= set(required[0])
 
 
+def test_control_controllers_have_no_compute_package(deployment):
+    control = Deployment(**{**deployment.__dict__, "profile": "control"})
+    for node in control.controllers:
+        context = Context(
+            control,
+            node.name,
+            str(uuid.uuid4()),
+            {"coordination/implementation": "valkey"},
+        )
+        packages = profiles.packages(context)
+        assert "nova-api" in packages
+        assert "nova-compute" not in packages
+        assert "keepalived" in packages
+    compute = Context(control, "compute1", str(uuid.uuid4()))
+    assert "nova-compute" in profiles.packages(compute)
+    single = Deployment(
+        **{
+            **control.__dict__,
+            "controllers": control.controllers[:1],
+            "api_address": control.controllers[0].address,
+        }
+    )
+    context = Context(
+        single,
+        single.bootstrap.name,
+        str(uuid.uuid4()),
+        {"coordination/implementation": "valkey"},
+    )
+    assert "nova-compute" not in profiles.packages(context)
+    assert "keepalived" not in profiles.packages(context)
+
+
 def test_optional_services_can_be_excluded_from_hyperconverged_profile(deployment):
     data = {
         **deployment.__dict__,

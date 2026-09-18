@@ -75,6 +75,9 @@ def setup():
 
     context = current()
     controller = context is None or context.controller
+    runs_compute = (
+        context is None or context.deployment.profile != "control" or not controller
+    )
     if controller:
         db_user, db_pass = mysql.ensure_service(SERVICE)
         db_api_user, db_api_pass = mysql.ensure_service("nova_api")
@@ -146,17 +149,16 @@ def setup():
                 "keymap": "en-us",
             },
         ),
-        *module_utils.dict_to_cfg_set_args(
-            "libvirt",
-            {
-                "virt_type": virt_type(),
-            },
+        *(
+            module_utils.dict_to_cfg_set_args("libvirt", {"virt_type": virt_type()})
+            if runs_compute
+            else []
         ),
         ("os_vif_ovs", "ovsdb_connection", ovn.local_connection()),
     )
     _ensure_questing_compat()
 
-    if ceph.installed() and cinder.installed():
+    if runs_compute and ceph.installed() and cinder.installed():
         pool = ceph.ensure_pool(cinder.VOLUME_POOL)
         module_utils.cfg_set(
             CONF,
@@ -214,7 +216,9 @@ def setup():
         core_utils.restart_service("nova-compute")
         return
 
-    nova_daemons = ["nova-api", "nova-scheduler", "nova-conductor", "nova-compute"]
+    nova_daemons = ["nova-api", "nova-scheduler", "nova-conductor"]
+    if runs_compute:
+        nova_daemons.append("nova-compute")
 
     if _api_runs_under_apache():
         nova_daemons.remove("nova-api")

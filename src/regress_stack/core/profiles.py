@@ -69,6 +69,24 @@ COMPUTE_MODULES = (
 
 def execution_order(context: Context, check_packages: bool = True) -> list[LocalModule]:
     modules = CONTROLLER_MODULES if context.controller else COMPUTE_MODULES
+    if context.controller and context.deployment.profile == "control":
+        modules = tuple(
+            LocalModule(
+                module.name,
+                module.local_dependencies,
+                module.shared_dependencies,
+                (
+                    "nova-api",
+                    "nova-conductor",
+                    "nova-scheduler",
+                    "nova-spiceproxy",
+                    "spice-html5",
+                )
+                if module.name == "nova"
+                else module.package_override,
+            )
+            for module in modules
+        )
     modules = tuple(
         module
         for module in modules
@@ -107,7 +125,7 @@ def packages(context: Context, no_tempest: bool = True) -> list[str]:
 
         required.extend(coordination.packages(context))
         required.append("haproxy")
-        if context.deployment.profile == "hyperconverged":
+        if len(context.deployment.controllers) == 3:
             required.append("keepalived")
     if context.controller and not no_tempest:
         required.extend(("tempest", "python3-tempestconf"))

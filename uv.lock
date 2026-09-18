@@ -1542,6 +1542,7 @@ dependencies = [
     { name = "python-apt" },
     { name = "python-openstackclient", version = "7.1.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "python-openstackclient", version = "7.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -1561,6 +1562,7 @@ requires-dist = [
     { name = "pyroute2", specifier = "<0.8" },
     { name = "python-apt", git = "https://salsa.debian.org/apt-team/python-apt.git?rev=3.0.0ubuntu1" },
     { name = "python-openstackclient", specifier = ">=7.1.4" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [package.metadata.requires-dev]

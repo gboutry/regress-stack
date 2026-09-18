@@ -7,10 +7,19 @@ restrict the Ubuntu release or Nova version. The existing
 single-node discovery.
 
 The `hyperconverged` profile has exactly three controllers. Each runs the same
-control-plane, compute, and Ceph services. Additional entries in `computes` run
-Nova compute, OVN host, and the metadata agent with Ceph client access. The
-`single` profile has one controller and may also have compute-only nodes; its
-API address is the controller address. It does not provide controller HA.
+control-plane, compute, and Ceph services. The `control` profile has one or
+three controllers running control-plane and Ceph services, without
+`nova-compute`; it requires at least one entry in `computes`. Three-controller
+profiles use a separate API VIP. Additional entries in `computes` run Nova
+compute, OVN host, and the metadata agent with Ceph client access. The
+`single` profile has one controller and may also have compute-only nodes. Both
+one-controller profiles use the controller address as the API endpoint and do
+not provide controller HA.
+
+Inventories may be JSON (`.json`) or YAML (`.yaml`/`.yml`), with identical
+fields and validation. The checked-in [JSON example](multinode-inventory.json)
+uses `hyperconverged`; set `profile` to `control` and add one or more `computes`
+for separate control and compute nodes. Preseeds remain private JSON files.
 
 An inventory may set `"disabled_modules": ["heat", "magnum", "watcher"]` to
 omit those services and their packages from an explicit profile. Magnum must
@@ -36,6 +45,30 @@ The example addresses in [multinode-inventory.json](multinode-inventory.json) ar
 documentation ranges; replace them with addresses assigned by your harness.
 Reserve the provider allocation range exclusively for this deployment.
 
+For a disposable LXD example, the following creates one controller VM with a
+management NIC and an unnumbered provider NIC. Repeat the `lxc init`, device,
+and start commands for every node in the inventory, giving each a distinct
+management address. Use a separate LXD project or test host so these network
+names do not conflict with other labs:
+
+```sh
+lxc network create rs-mgmt ipv4.address=10.220.10.1/24 ipv4.nat=true ipv6.address=none
+lxc network create rs-provider ipv4.address=10.220.20.1/24 ipv4.dhcp=false ipv4.nat=true ipv6.address=none
+lxc init ubuntu:24.04 node1 --vm -c limits.cpu=4 -c limits.memory=16GiB -d root,size=80GiB
+lxc config device override node1 eth0 network=rs-mgmt ipv4.address=10.220.10.11
+lxc config device add node1 provider nic network=rs-provider name=eth1
+lxc start node1
+lxc exec node1 -- ip -j address show
+```
+
+Set the inventory management CIDR to `10.220.10.0/24`, reserve a different
+address such as `10.220.10.10` for the API VIP in three-controller profiles,
+and use `10.220.20.0/24` as the provider CIDR with gateway `10.220.20.1`.
+Use provider allocation addresses outside LXD's own use. Check the guest's
+actual interface names and IP assignment with the last command before writing
+`management_interface` and `provider_interface` into the inventory. The
+provider interface must not acquire an IP address inside the guest.
+
 Use an isolated test network. These recipes use authenticated service protocols
 but do not configure transport TLS. They expose database, messaging, storage,
 OVN, and API ports to that network. Preseeds must travel over an authenticated,
@@ -53,7 +86,7 @@ minimum size 2, and host-level CRUSH placement.
    controller, with the appropriate local name:
 
    ```sh
-   regress-stack packages --inventory inventory.json --node node1
+   regress-stack packages --inventory inventory.json --node "$(hostname --short)"
    ```
 
    The operator installs that package list for the chosen Ubuntu/OpenStack
@@ -71,7 +104,7 @@ minimum size 2, and host-level CRUSH placement.
 2. On the first controller:
 
    ```sh
-   sudo regress-stack setup --inventory inventory.json --node node1 \
+   sudo regress-stack setup --inventory inventory.json --node "$(hostname --short)" \
        --export-preseeds /root/regress-preseeds
    ```
 

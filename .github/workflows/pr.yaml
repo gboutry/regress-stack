@@ -28,7 +28,7 @@ jobs:
         sudo apt update
         sudo apt install --yes dpkg-dev libapt-pkg-dev
 
-    - name: Check multinode types
+    - name: Check multinode types with mypy
       run: uv run mypy
 
     - name: Run unit-tests

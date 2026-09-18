@@ -61,6 +61,34 @@ def test_chassis_check_can_reach_remote_leader(context, monkeypatch):
     assert "OVN compute host identities" not in failures
 
 
+def test_control_readiness_distinguishes_gateways_from_compute(context, monkeypatch):
+    import dataclasses
+    import json
+    from unittest.mock import Mock
+
+    from regress_stack.multinode import readiness
+
+    control = dataclasses.replace(
+        context, deployment=dataclasses.replace(context.deployment, profile="control")
+    )
+    chassis = [[node.name, node.name] for node in control.deployment.nodes]
+
+    def run(command, args):
+        if command == "ovn-sbctl" and "Chassis" in args:
+            return json.dumps({"data": chassis})
+        raise RuntimeError("Unrelated live check")
+
+    client = Mock()
+    client.compute.services.return_value = [
+        Mock(host="compute1", state="up", status="enabled")
+    ]
+    monkeypatch.setattr(readiness.common, "run", run)
+    monkeypatch.setattr("regress_stack.modules.keystone.o7k", lambda: client)
+    failures = readiness.check(control)
+    assert "OVN compute host identities" not in failures
+    assert "Nova compute registration" not in failures
+
+
 def test_cinder_services_use_version_independent_rest_api():
     from unittest.mock import Mock
     from regress_stack.multinode.readiness import volume_hosts

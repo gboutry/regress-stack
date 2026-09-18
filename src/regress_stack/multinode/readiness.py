@@ -107,8 +107,16 @@ def check(context: Context, unavailable: str | None = None) -> list[str]:
     expected_controllers = {
         node.name for node in context.deployment.controllers if node.name != unavailable
     }
-    expected_computes = {
+    expected_chassis = {
         node.name for node in context.deployment.nodes if node.name != unavailable
+    }
+    compute_nodes = (
+        context.deployment.computes
+        if context.deployment.profile == "control"
+        else context.deployment.nodes
+    )
+    expected_computes = {
+        node.name for node in compute_nodes if node.name != unavailable
     }
     failures: list[str] = []
 
@@ -268,7 +276,7 @@ def check(context: Context, unavailable: str | None = None) -> list[str]:
         )["data"]
         return {
             name for name, hostname in rows if name == hostname and name != unavailable
-        } == expected_computes
+        } == expected_chassis
 
     verify("OVN compute host identities", chassis)
     masters: list[str] = []

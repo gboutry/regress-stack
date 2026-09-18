@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 import json
+import dataclasses
 import subprocess
 from unittest.mock import Mock
 
@@ -490,6 +491,53 @@ def test_nova_preparation_starts_libvirt_before_secret_definition(
     with activate(request.getfixturevalue(role)):
         services.prepare("nova")
     run.assert_any_call("systemctl", ["start", "libvirtd"])
+
+
+def test_control_preparation_does_not_start_libvirt(context, monkeypatch):
+    from regress_stack.multinode import services
+
+    control = dataclasses.replace(
+        context, deployment=dataclasses.replace(context.deployment, profile="control")
+    )
+    run = Mock()
+    monkeypatch.setattr(common, "run", run)
+    monkeypatch.setattr(services.utils, "cfg_set", Mock())
+    with activate(control):
+        services.prepare("nova")
+    assert ("systemctl", ["start", "libvirtd"]) not in [
+        call.args for call in run.call_args_list
+    ]
+
+
+def test_control_nova_starts_api_services_without_compute(context, monkeypatch):
+    from regress_stack.modules import nova
+
+    control = dataclasses.replace(
+        context, deployment=dataclasses.replace(context.deployment, profile="control")
+    )
+    monkeypatch.setattr(mysql, "ensure_service", lambda _: ("nova", "password"))
+    monkeypatch.setattr(rabbitmq, "ensure_service", lambda _: ("nova", "password"))
+    monkeypatch.setattr(
+        keystone, "ensure_service_account", lambda *_: ("nova", "password")
+    )
+    monkeypatch.setattr(nova.module_utils, "cfg_set", Mock())
+    monkeypatch.setattr(nova.module_utils, "bootstrap", lambda: False)
+    monkeypatch.setattr(nova, "_ensure_questing_compat", Mock())
+    monkeypatch.setattr(nova, "_api_runs_under_apache", lambda: False)
+    monkeypatch.setattr(nova.ceph, "installed", lambda: False)
+    monkeypatch.setattr(nova.barbican, "installed", lambda: False)
+    monkeypatch.setattr(
+        nova, "virt_type", Mock(side_effect=AssertionError("no libvirt"))
+    )
+    restarted = Mock()
+    monkeypatch.setattr(nova.core_utils, "restart_service", restarted)
+    with activate(control):
+        nova.setup()
+    assert {call.args[0] for call in restarted.call_args_list} == {
+        "nova-api",
+        "nova-scheduler",
+        "nova-conductor",
+    }
 
 
 def test_database_capacity_covers_three_controller_clients(context):

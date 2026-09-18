@@ -5,6 +5,7 @@ import dataclasses
 import json
 import os
 import uuid
+import yaml
 
 import pytest
 
@@ -65,6 +66,34 @@ def test_single_controller_with_compute(inventory):
     assert len(deployment.nodes) == 2
     with pytest.raises(ValueError):
         dataclasses.replace(deployment, api_address="192.0.2.10")
+
+
+def test_control_profile_requires_compute_and_keeps_vip(inventory):
+    control = dataclasses.replace(inventory, profile="control")
+    assert control.computes == inventory.computes
+    with pytest.raises(ValueError, match="at least one compute"):
+        dataclasses.replace(control, computes=())
+    with pytest.raises(ValueError, match="API VIP"):
+        dataclasses.replace(control, api_address=control.controllers[0].address)
+    single_control = dataclasses.replace(
+        control, controllers=control.controllers[:1], api_address="192.0.2.1"
+    )
+    assert len(single_control.controllers) == 1
+    with pytest.raises(ValueError, match="single-controller endpoint"):
+        dataclasses.replace(single_control, api_address="192.0.2.10")
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".yml"])
+def test_yaml_inventory_uses_same_validation(inventory, tmp_path, suffix):
+    path = tmp_path / f"inventory{suffix}"
+    path.write_text(yaml.safe_dump(dataclasses.asdict(inventory)))
+    assert Deployment.read(path) == inventory
+    path.write_text("[]\n")
+    with pytest.raises(ValueError, match="must be an object"):
+        Deployment.read(path)
+    path.write_text("controllers: [\n")
+    with pytest.raises(ValueError, match="Invalid YAML"):
+        Deployment.read(path)
 
 
 @pytest.mark.parametrize(

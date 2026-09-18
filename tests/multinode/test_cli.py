@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import yaml
 
 from click.testing import CliRunner
 
@@ -31,6 +32,18 @@ def test_compute_package_cli(context, tmp_path):
         "nova-api",
         "keystone",
     }
+
+
+def test_yaml_control_inventory_package_cli(context, tmp_path):
+    inventory = tmp_path / "inventory.yaml"
+    data = dataclasses.asdict(context.deployment)
+    data["profile"] = "control"
+    inventory.write_text(yaml.safe_dump(data))
+    result = CliRunner().invoke(
+        main, ["packages", "--inventory", str(inventory), "--node", "compute1"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "nova-compute" in result.output.split()
 
 
 def test_setup_rejects_target_with_inventory_before_configuration(

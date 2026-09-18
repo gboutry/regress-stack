@@ -19,6 +19,7 @@ import stat
 import tempfile
 from typing import Iterator, Mapping, Optional
 import uuid
+import yaml
 
 
 _NAME = re.compile(r"[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
@@ -101,9 +102,11 @@ class Deployment:
             raise ValueError("Unsupported disabled module")
         if "heat" in self.disabled_modules and "magnum" not in self.disabled_modules:
             raise ValueError("Disabling heat also requires disabling magnum")
-        expected = {"single": 1, "hyperconverged": 3}.get(self.profile)
-        if expected is None or len(self.controllers) != expected:
+        allowed_counts = {"single": {1}, "hyperconverged": {3}, "control": {1, 3}}
+        if len(self.controllers) not in allowed_counts.get(self.profile, set()):
             raise ValueError("Profiles require exactly one or three controllers")
+        if self.profile == "control" and not self.computes:
+            raise ValueError("The control profile requires at least one compute node")
         nodes = self.nodes
         if len({node.name for node in nodes}) != len(nodes):
             raise ValueError("Node names must be unique")
@@ -121,7 +124,7 @@ class Deployment:
                 )
         if management.overlaps(ipaddress.IPv4Network(self.provider.cidr)):
             raise ValueError("Management and provider subnets must not overlap")
-        if self.profile == "hyperconverged":
+        if len(self.controllers) == 3:
             if self.api_address in {node.address for node in nodes}:
                 raise ValueError(
                     "The API VIP must be reserved separately from node addresses"
@@ -164,7 +167,16 @@ class Deployment:
 
     @classmethod
     def read(cls, path: Path) -> "Deployment":
-        return cls.from_dict(json.loads(path.read_text()))
+        if path.suffix.lower() in {".yaml", ".yml"}:
+            try:
+                data = yaml.safe_load(path.read_text())
+            except yaml.YAMLError:
+                raise ValueError("Invalid YAML deployment inventory") from None
+        else:
+            data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError("Deployment inventory must be an object")
+        return cls.from_dict(data)
 
 
 @dataclasses.dataclass(frozen=True, repr=False)

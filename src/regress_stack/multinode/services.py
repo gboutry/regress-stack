@@ -89,7 +89,7 @@ def prepare(name: str) -> None:
                     context.secret(f"keystone/{folder}/{number}"),
                     user="keystone",
                 )
-    if name == "nova":
+    if name == "nova" and context.deployment.profile != "control":
         # The native module defines a Ceph secret before starting Nova.
         common.run("systemctl", ["start", "libvirtd"])
         utils.cfg_set(
