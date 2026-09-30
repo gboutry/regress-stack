@@ -120,7 +120,12 @@ def test_optional_services_can_be_excluded_from_hyperconverged_profile(deploymen
     }
     scoped = Deployment(**data)
     for node in scoped.controllers:
-        context = Context(scoped, node.name, str(uuid.uuid4()))
+        context = Context(
+            scoped,
+            node.name,
+            str(uuid.uuid4()),
+            {"coordination/implementation": "valkey"},
+        )
         names = {module.name for module in profiles.execution_order(context, False)}
         assert {"nova", "neutron", "ovn"} <= names
         assert not names & {"heat", "magnum", "watcher"}
