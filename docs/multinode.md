@@ -230,7 +230,12 @@ restores any existing `policy-rc.d` afterwards.
 CI exposes provisioning, installation, setup, readiness, and Tempest as separate
 steps. Each command reports its node, phase, timestamp, and exit status, with a
 heartbeat during long commands. Stdout and stderr are captured separately;
-only package-command stdout is passed to APT. A small Python log filter handles
+only package-command stdout is passed to APT. Tempest test names, worker IDs,
+durations, outcomes, and final pass/skip/fail totals are streamed while tests
+run and retained in `node1-tempest.stdout.log`. Live test output includes only
+recognized result and numeric summary lines. Arbitrary attachments, tracebacks,
+and skip reasons are excluded because they can contain credentials.
+A small Python log filter handles
 structured credential inventories and encoded secrets; it does not provision
 or orchestrate the deployment. Output from credential-bearing commands is
 published only after filtering against the available node state and Tempest

@@ -36,6 +36,7 @@ fi
 nodes=(node1 node2 node3)
 command_pid=
 heartbeat_pid=
+follower_pid=
 project=
 record_phase=false
 
@@ -92,12 +93,19 @@ publish() {
         options=(--credentials "$work_dir/credentials")
     fi
     for stream in stdout stderr; do
+        if [[ ! -s "$work_dir/logs/$name.$stream" ]]; then
+            : > "$artifacts/$name.$stream.log"
+            continue
+        fi
         if ! python3 "$SCRIPT_DIR/sanitize.py" "${options[@]}" \
             < "$work_dir/logs/$name.$stream" > "$work_dir/logs/$name.$stream.filtered"; then
             log "$name/$stream: output withheld because filtering failed"
             continue
         fi
         cp "$work_dir/logs/$name.$stream.filtered" "$artifacts/$name.$stream.log"
+        # Test outcomes were already published live; retain the full filtered
+        # stdout artifact without replaying every result in the console.
+        if [[ "$name" == node1-tempest && "$stream" == stdout ]]; then continue; fi
         while IFS= read -r line || [[ -n "$line" ]]; do
             log "[$name/$stream] $line"
         done < "$artifacts/$name.$stream.log"
@@ -114,6 +122,13 @@ run() {
         set -- lxc --force-local --project "$project" exec "$node" --mode=non-interactive -- "$@"
     fi
     log "$name: starting"
+    if [[ "$name" == node1-tempest ]]; then
+        : > "$work_dir/logs/$name.stdout"
+        rm -f "$work_dir/logs/$name.done"
+        python3 "$SCRIPT_DIR/sanitize.py" --follow "$work_dir/logs/$name.stdout" \
+            --done "$work_dir/logs/$name.done" --prefix "[$phase] [$name/stdout] " &
+        follower_pid=$!
+    fi
     timeout --signal=TERM --kill-after=30s "${seconds}s" "$@" \
         > "$work_dir/logs/$name.stdout" 2> "$work_dir/logs/$name.stderr" &
     command_pid=$!
@@ -135,6 +150,11 @@ run() {
     kill "$heartbeat_pid" 2>/dev/null || true
     wait "$heartbeat_pid" 2>/dev/null || true
     heartbeat_pid=
+    if [[ -n "$follower_pid" ]]; then
+        touch "$work_dir/logs/$name.done"
+        wait "$follower_pid" || log "$name: live result filtering failed"
+        follower_pid=
+    fi
     publish "$name"
     log "$name: exit status $status"
     return "$status"
@@ -278,6 +298,10 @@ finish() {
         wait "$command_pid" 2>/dev/null || true
     fi
     if [[ -n "$heartbeat_pid" ]]; then kill "$heartbeat_pid" 2>/dev/null || true; fi
+    if [[ -n "$follower_pid" ]]; then
+        kill "$follower_pid" 2>/dev/null || true
+        wait "$follower_pid" 2>/dev/null || true
+    fi
     if "$record_phase"; then
         jq -n --arg phase "$phase" --argjson status "$status" \
             '{phase: $phase, exit_status: $status}' > "$artifacts/phase-$phase.json"

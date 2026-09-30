@@ -110,13 +110,9 @@ def system(
     from regress_stack.core.deployment import current
 
     if current() is not None:
-        from regress_stack.multinode.common import run as private_run
+        from regress_stack.multinode.results import run as result_run
 
-        try:
-            private_run("sh", ["-c", cmd], env=env, cwd=cwd, timeout=None)
-        except subprocess.CalledProcessError as error:
-            return error.returncode
-        return 0
+        return result_run("sh", ["-c", cmd], env=env, cwd=cwd)
     exit_code = -1
     saved_env = os.environ
     saved_cwd = os.getcwd()

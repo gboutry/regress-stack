@@ -9,7 +9,10 @@ import json
 from pathlib import Path
 import re
 import sys
+import time
 from urllib.parse import quote, quote_plus
+
+# This module uses only stdlib dependencies and the checkout's recipe helpers.
 
 
 def redact(text, secrets):
@@ -53,7 +56,38 @@ def read_secrets(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--credentials", type=Path)
+    parser.add_argument("--follow", type=Path)
+    parser.add_argument("--done", type=Path)
+    parser.add_argument("--prefix", default="")
     args = parser.parse_args()
+    if args.follow:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+        from regress_stack.multinode.results import result_line
+
+        if args.done is None:
+            parser.error("--follow requires --done")
+        with args.follow.open() as stream:
+            pending = ""
+            while True:
+                finished = args.done.exists()
+                pending += stream.read()
+                lines = pending.split("\n")
+                pending = lines.pop()
+                if finished:
+                    lines.append(pending)
+                for line in lines:
+                    output = result_line(line)
+                    if output is not None:
+                        from datetime import datetime, timezone
+
+                        stamp = datetime.now(timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        )
+                        print(f"{stamp} {args.prefix}{output}", flush=True)
+                if finished:
+                    return
+                time.sleep(0.2)
+        return
     try:
         secrets = read_secrets(args.credentials) if args.credentials else []
     except (ValueError, KeyError, TypeError, OSError, configparser.Error):

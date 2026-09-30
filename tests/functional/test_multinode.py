@@ -9,6 +9,7 @@ from pathlib import Path
 import runpy
 import shutil
 import subprocess
+import threading
 
 import pytest
 
@@ -78,6 +79,7 @@ def shell_cli(tmp_path):
 import os
 from pathlib import Path
 import sys
+import time
 
 name = Path(sys.argv[0]).name
 args = sys.argv[1:]
@@ -118,6 +120,15 @@ if "query" in args:
     sys.exit(0)
 if "pull" in args:
     Path(args[-1]).write_text("a-private-generated-value")
+if "/root/multinode-guest.sh" in args and args[-1] == "test":
+    print("{0} tempest.test_first [0.1s] ... ok", flush=True)
+    if os.environ.get("TEST_GATE"):
+        while not Path(os.environ["TEST_GATE"]).exists():
+            time.sleep(0.01)
+    print("Totals", flush=True)
+    print("Ran: 1 tests in 0.1000 sec.", flush=True)
+    print(" - Passed: 1", flush=True)
+    print(" - Failed: 0", flush=True)
 if "dpkg-query" in args:
     print("nova-compute\t1:version")
 else:
@@ -148,7 +159,15 @@ if "/root/multinode-guest.sh" in args and args[args.index("/root/multinode-guest
         "BASH_ENV": str(bash_env),
     }
 
-    def run(phase, **extra):
+    def run(phase, *, streaming=False, **extra):
+        if streaming:
+            return subprocess.Popen(
+                ["bash", str(DIRECTORY / "run.sh"), phase],
+                env={**env, **extra},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
         return subprocess.run(
             ["bash", str(DIRECTORY / "run.sh"), phase],
             env={**env, **extra},
@@ -158,6 +177,37 @@ if "/root/multinode-guest.sh" in args and args[args.index("/root/multinode-guest
         )
 
     return run, work, artifacts, calls
+
+
+def test_tempest_cli_publishes_progress_before_completion(shell_cli, tmp_path):
+    run, _, artifacts, _ = shell_cli
+    gate = tmp_path / "release"
+    seen = threading.Event()
+    lines = []
+    process = run("test", streaming=True, TEST_GATE=str(gate))
+
+    def console():
+        for line in process.stdout:
+            lines.append(line)
+            if "tempest.test_first" in line:
+                seen.set()
+
+    thread = threading.Thread(target=console)
+    thread.start()
+    try:
+        assert seen.wait(5), "Test result did not reach the CI console"
+        assert process.poll() is None, "Results arrived only after process completion"
+    finally:
+        gate.touch()
+        process.wait(timeout=10)
+        thread.join(10)
+    assert not thread.is_alive()
+    assert process.returncode == 0, process.stderr.read()
+    output = "".join(lines)
+    assert output.count("tempest.test_first") == 1
+    assert "Ran: 1 tests" in output
+    assert " - Passed: 1" in output and " - Failed: 0" in output
+    assert "tempest.test_first" in (artifacts / "node1-tempest.stdout.log").read_text()
 
 
 @pytest.mark.parametrize("phase", ["install", "setup", "test"])
