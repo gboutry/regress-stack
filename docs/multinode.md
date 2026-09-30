@@ -208,6 +208,77 @@ which workload and lock conditions were exercised.
 
 ## Developer verification
 
+PR CI runs three-node hyperconverged deployments on Jammy/Yoga, Noble/Caracal,
+and Resolute/Gazpacho, using the corresponding Ubuntu archive packages. Each
+matrix job uses a `2xlarge-extra` self-hosted runner and three LXD VMs with
+8 vCPUs, 24 GiB RAM, and 80 GiB disks. The host requires KVM, at least 26 CPUs,
+80 GiB of available RAM, and 270 GiB of free space in its LXD storage pool.
+
+Terraform provisions the three VMs and the management/provider bridges using the
+pinned LXD provider. LXD selects unused IPv4 /24s; the guests use static
+management addresses and unnumbered provider interfaces. The public inventory
+is a Terraform output. VM instances use no inherited profiles and live in a
+private test project. Bridge networks live in the default LXD project.
+
+Shell scripts install each node's declared packages, bootstrap the first
+controller, transfer private preseeds, and join the other controllers in order.
+They require readiness on all three nodes, run Tempest without retries, and
+check readiness again. They do not inject controller failures or establish HA
+recovery. Package installation temporarily suppresses service startup and
+restores any existing `policy-rc.d` afterwards.
+
+CI exposes provisioning, installation, setup, readiness, and Tempest as separate
+steps. Each command reports its node, phase, timestamp, and exit status, with a
+heartbeat during long commands. Stdout and stderr are captured separately;
+only package-command stdout is passed to APT. A small Python log filter handles
+structured credential inventories and encoded secrets; it does not provision
+or orchestrate the deployment. Output from credential-bearing commands is
+published only after filtering against the available node state and Tempest
+configuration. If that credential inventory is incomplete, output is withheld
+and the node, phase, and exit status remain visible.
+
+Diagnostics and cleanup run even after a failed CI step. Terraform destroys
+only resources recorded in the test's private state. Temporary forwarding rules
+permit traffic from the test bridges and established replies, without flushing
+existing firewall rules or changing host policies. Cleanup removes those rules.
+
+To run the same deployment on an initialized LXD host, install Terraform 1.7+
+(CI pins 1.16.4), `jq`, Python 3, and `iptables`, then run:
+
+```sh
+sudo bash tests/functional/multinode/run.sh all --release noble \
+    --work-dir /tmp/regress-multinode-private \
+    --artifacts /tmp/regress-multinode-results --pool default
+```
+
+The private work directory and artifact directory must not already exist and
+must not contain one another. Use the `check-host` phase with the same arguments
+for the read-only prerequisite check. Omit `--pool` when LXD has exactly one
+storage pool. The work directory contains private raw output and runtime
+credential files; never upload it. Preseeds stay outside Terraform state and
+are transferred through the local LXD socket with mode 0600. Cleanup removes
+the private work directory on success. Failed cleanup retains state for an
+explicit retry with the `cleanup` phase and the same arguments.
+
+Artifacts contain the public inventory, tested commit, package manifests,
+per-command filtered stdout/stderr, and phase exit statuses in `result.json`.
+They do not contain Terraform state, preseeds, service configuration, or Tempest
+credentials. Single-node tests continue to use Spread.
+
+Check the provisioning configuration and scripts without creating VMs:
+
+```sh
+terraform -chdir=tests/functional/multinode init -backend=false -lockfile=readonly
+terraform -chdir=tests/functional/multinode fmt -check
+terraform -chdir=tests/functional/multinode validate
+terraform -chdir=tests/functional/multinode test
+shellcheck tests/functional/multinode/*.sh
+```
+
+Terraform tests use a mock provider. Python unit tests execute the real shell
+entry point with fake host commands. These checks do not establish a live
+three-VM OpenStack deployment.
+
 Run the native checks:
 
 ```sh

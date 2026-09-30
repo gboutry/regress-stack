@@ -36,3 +36,6 @@ jobs:
 
   functional-tests:
     uses: ./.github/workflows/functional-tests.yaml
+
+  multinode-tests:
+    uses: ./.github/workflows/multinode-tests.yaml
