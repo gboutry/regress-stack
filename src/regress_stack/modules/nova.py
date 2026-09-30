@@ -43,7 +43,6 @@ BASE_PACKAGES = [
     "nova-compute",
     "nova-spiceproxy",
     "spice-html5",
-    "qemu-system-modules-spice",
 ]
 LOG = logging.getLogger(__name__)
 
@@ -68,7 +67,15 @@ NOVA_PRIVSEP_HELPER = (
 
 
 def determine_packages(no_tempest: bool = False) -> list[str]:
-    return list(BASE_PACKAGES)
+    packages = list(BASE_PACKAGES)
+    if (
+        core_apt.PkgVersionCompare("qemu-system-common", candidate=True, upstream=True)
+        >= "8.1.0"
+    ):
+        packages.append("qemu-system-modules-spice")
+    else:
+        packages.append("qemu-system-common")
+    return packages
 
 
 def setup():
